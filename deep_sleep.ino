@@ -1,90 +1,83 @@
- #include <NTPClient.h>
- #include <WiFi.h>
- #include <WiFiUdp.h>
- #include <LiquidCrystal_I2C.h>
 
-LiquidCrystal_I2C lcd(0x27, 16, 2);
+#include <SPI.h>
+#include <WiFi.h>
 
-char ssid[] = "ADMIN_2g";       // your network SSID (name)
-char password[] = "4635410009";  // your network key
+#include "esp_sleep.h"
 
-// กำหนดค่า offset time เนื่องจากเวลาของเซิฟเวอร์นี้เป็นเวลา UTC เราต้องทำให้เป็นเวลาของประเทศไทย
-// เวลาของประเทศไทย = UTC+7 ชั่วโมง ต้องกำหนด offset time = 7 ชั่วโมง
-const long offsetTime = 25200;       // หน่วยเป็นวินาที จะได้ 7*60*60 = 25200
+#define INTERVAL_MESSAGE1 5000 //5วินาที
+#define INTERVAL_MESSAGE2 7000 //7วินาที
+#define INTERVAL_MESSAGE3 11000 //11วินาที
+#define INTERVAL_MESSAGE4 13000 //13วินาที
 
-// กำหนด object ของ WiFiUDP ชื่อว่า ntpUDP
-WiFiUDP ntpUDP;
+#define uS_TO_S_FACTOR 1000000ULL  /* Conversion factor for micro seconds to seconds */
+#define TIME_TO_SLEEP  20        /* Time ESP32 will go to sleep (in seconds) */
 
-// กำหนด object ของ NTPClient ชื่อว่า timeClient มีรูปแบบ ("WiFiUDP Object","NTP Server Address","offset time")
-NTPClient timeClient(ntpUDP, "pool.ntp.org", offsetTime);
+const char *ssid     = "ADMIN";
+const char *password = "12345678";
 
-// กำหนดตัวแปรเก็บค่าเวลา ชั่วโมง-นาที-วินาที
-int hourNow, minuteNow, secondNow;
+int t = 0;
+unsigned long time_1 = 0;
+unsigned long time_2 = 0;
+unsigned long time_3 = 0;
+unsigned long time_4 = 0;
+ 
+void print_time(unsigned long time_millis);
 
 void initWiFi() {
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
   String ppoint = ".";
 //  while (WiFi.status() != WL_CONNECTED)
-  for (int i=0; i<= 10; i++) {
+  for (int i=0; i<= 5; i++) {
     if(WiFi.status() != WL_CONNECTED) {
       delay(1000);
-      showlcd("Connecting", String(ppoint));
+      Serial.println(String(ppoint));
       delay(1000);
-      showlcd("Connecting", String(ppoint));
-      delay(1000);
-      ppoint += String(".");
+      ppoint += String("K");
     }
     else {
-      showlcd(String(WiFi.localIP()), "RSSI : " + String(WiFi.RSSI()));
+      Serial.println(String(WiFi.localIP()));
       delay(3000);
-      showlcd("    WELLCOME    ", "INTERNET IN TIME");
       break;
     }
   }
 }
-
-void showlcd(String line1, String line2) {
-  lcd.setCursor(0, 0);
-  lcd.print(line1);
-  lcd.setCursor(0, 1);
-  lcd.print(line2);
-}
-
-void setup(){
-// เริ่มใช้งาน LCD
-  lcd.begin();
-  lcd.backlight();
-  WiFi.begin(ssid, password);
-// เริ่มการทำงานของ NTPClient
-  timeClient.begin();
+ 
+void setup() {
+  Serial.begin(115200);
   initWiFi();
-  lcd.clear();
+  esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR); // หลังจาก esp_deep_sleep_start แล้วนับไปอีก 20วิจะเริ่มทำงาน
 }
-
+ 
 void loop() {
-
-  if (WiFi.status() == WL_NO_SHIELD) {
-    initWiFi();
-  }
-
-// ร้องขอ timestamps ด้วยคำสั่ง update
-  timeClient.update();
-// get ค่าวินาที นาที ชั่วโมง ไปเก็บไว้ในตัวแปร
-//  secondNow = timeClient.getSeconds();
-  minuteNow = timeClient.getMinutes();
-//  hourNow = timeClient.getHours();
-
-  showlcd("  This is Time", String(timeClient.getFormattedTime()));
-  if(minuteNow == 36)
-  {
-    lcd.noBacklight();
-    showlcd("  noBacklight", String(timeClient.getFormattedTime()));
-  }
-  else if (minuteNow == 39)
-  {
-    lcd.backlight();
-    showlcd("  This is Time", String(timeClient.getFormattedTime()));
-  }
-
+    if(millis() - time_1 > INTERVAL_MESSAGE1){
+        time_1 = millis();
+        print_time(time_1);
+        Serial.println("I'm message number one!");
+    }
+   
+    if(millis() - time_2 > INTERVAL_MESSAGE2){
+        time_2 = millis();
+        print_time(time_2);
+        Serial.println("Hello, I'm the second message.");
+        esp_deep_sleep_start();
+    }
+   
+    if(millis() - time_3 > INTERVAL_MESSAGE3){
+        time_3 = millis();
+        print_time(time_3);
+        Serial.println("My name is Message the third.");
+    }
+   
+    if(millis() - time_4 > INTERVAL_MESSAGE4){
+        time_4 = millis();
+        print_time(time_4);
+        Serial.println("Message four is in the house!");
+    }
+}
+ 
+void print_time(unsigned long time_millis){
+    Serial.print("Time: ");
+    Serial.print(time_millis/1000);
+    Serial.print("s - ");
 }
